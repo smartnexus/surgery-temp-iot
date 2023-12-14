@@ -1,4 +1,4 @@
-CONTIKI_PROJECT = mando
+CONTIKI_PROJECT = remote
 all: $(CONTIKI_PROJECT)
 
 CONTIKI = ../..
