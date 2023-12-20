@@ -60,7 +60,7 @@
 /*---Importaciones-----------------------------------------------------------*/
 
 #include <stdio.h> // printf()
-//#include <stdlib.h> // atoi()
+#include <stdlib.h> // atoi()
 //#include <string.h>
 #include "contiki.h"
 #include "os/sys/process.h" // PROCESS_EVENT_POLL
@@ -75,8 +75,9 @@
 #include "os/net/ipv6/simple-udp.h"
 
 /*---Procesos----------------------------------------------------------------*/
-PROCESS(main_process, "main_process #1");
-AUTOSTART_PROCESSES(&main_process);
+PROCESS(main_process, "main_process");
+PROCESS(keepalive_process, "keepalive_process");
+AUTOSTART_PROCESSES(&main_process,&keepalive_process);
 
 /*---Variables-Globales------------------------------------------------------*/
 
@@ -103,8 +104,7 @@ udp_rx_callback(struct simple_udp_connection *c,
 {
   
   char str_rx[4]; //Buffer de recepcion
-  uint8_t nodo_recibido;
-  uint8_t valor_recibido;
+  uint8_t valor_recibido[2];
 
   LOG_INFO("Direccion = ");
   LOG_INFO_6ADDR(sender_addr);
@@ -113,12 +113,17 @@ udp_rx_callback(struct simple_udp_connection *c,
 
   //Parseo de los datos recibidos
   sprintf(str_rx,"%s",(char *) data);
-  nodo_recibido = str_rx[0];
-  valor_recibido = str_rx[2];
-  LOG_INFO("Nodo: %d Valor: %d \n", nodo_recibido,valor_recibido);
+  valor_recibido[0] = atoi(&str_rx[0]);
+  valor_recibido[1] = atoi(&str_rx[2]);
+  LOG_INFO("Nodo1: %d Nodo2: %d \n\n", valor_recibido[0],valor_recibido[1]);
 
   //Cambio del valor del flag recibido
-  state_nodo[nodo_recibido] = valor_recibido;
+  if (valor_recibido[0]!=0){
+    state_nodo[0] = valor_recibido[0];
+  }
+  if (valor_recibido[1]!=0){
+    state_nodo[1] = valor_recibido[1];
+  }
 
   //Notificacion al proceso principal para que represente el estado si procede
   process_poll(&main_process);
@@ -152,6 +157,42 @@ static void representacion_leds(uint8_t nodo, uint8_t valor){
   }
 
 }
+
+/*---keepalive_process-------------------------------------------------------*/
+PROCESS_THREAD(keepalive_process, ev, data)
+{
+  static struct etimer periodic_timer;
+  static char str_tx[3];
+  uip_ipaddr_t dest_ipaddr;
+
+  PROCESS_BEGIN();
+
+  /* Initialize UDP connection */
+  simple_udp_register(&udp_conn, UDP_CLIENT_PORT, NULL,
+                      UDP_SERVER_PORT, udp_rx_callback);
+
+  etimer_set(&periodic_timer, CLOCK_SECOND * 10);
+
+  while(1) {
+    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&periodic_timer));
+
+    if(NETSTACK_ROUTING.node_is_reachable() && NETSTACK_ROUTING.get_root_ipaddr(&dest_ipaddr)) {
+
+      /* Send to DAG root */
+      LOG_INFO("\n Enviando KeepAlive \n");
+      snprintf(str_tx, sizeof(str_tx), "4>");
+      LOG_INFO("   Enviando la cadena '%s' \n\n",str_tx);
+      simple_udp_sendto(&udp_conn, str_tx, strlen(str_tx), &dest_ipaddr);
+
+    } else {
+      LOG_INFO("Not reachable yet\n");
+    }
+    etimer_reset(&periodic_timer);
+  }
+
+  PROCESS_END();
+}
+
 
 /*---main_process------------------------------------------------------------*/
 PROCESS_THREAD(main_process, ev, data){ 
@@ -248,11 +289,12 @@ PROCESS_THREAD(main_process, ev, data){
         printf("Nodo %d : %d \n",1, state_nodo[1]);
 
       }      
-
+      printf("\n");
     }
 
     /* Evento de release */
     if ( ev==button_hal_release_event){
+      printf("\n");
       printf("Liberacion de boton \n");      
 
       /* Pulsacion corta */
@@ -280,7 +322,7 @@ PROCESS_THREAD(main_process, ev, data){
           /* Send to DAG root */
           LOG_INFO("Enviando el nuevo valor del nodo %d \n",nodo);
           snprintf(str_tx, sizeof(str_tx), "3>%d:%d",nodo,state_nodo[nodo]);
-          LOG_INFO("   Enviando la cadena '%s' \n",str_tx);
+          LOG_INFO("   Enviando la cadena '%s' \n\n",str_tx);
           simple_udp_sendto(&udp_conn, str_tx, strlen(str_tx), &dest_ipaddr);
 
         } else {
