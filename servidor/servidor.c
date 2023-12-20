@@ -17,11 +17,13 @@
 
 #include "com.h"
 
+void push_mqtt(char* data, uint8_t datatype, uint8_t nodeid);
+
 static struct simple_udp_connection connections[2];
 int ports[2] = {SENSOR_PORT, REMOTO_PORT};
-void split_char(char* input, char ptr[2][10], char* delimiter);
-void push_mqtt(char* data, uint8_t datatype, uint8_t nodeid);
-int8_t pending_update = -1;
+
+int8_t pending_update = 0;
+int flags[2] = {0,0};
 
 /*---------------------------------------------------------------------------*/
 PROCESS(udp_server_process, "UDP server");
@@ -50,12 +52,12 @@ static void udp_rx_callback(struct simple_udp_connection *c, const uip_ipaddr_t 
       LOG_INFO("   --> <msg=1> recibida medida de temperatura: %s\n", content);
       push_mqtt(content, TEMPERATURE, SENSOR_ID);
       // Send pending flag updates to SENSOR
-      if(pending_update != -1) {
+      if(pending_update != 0) {
          static char info[2];
          snprintf(info, sizeof(info), "%d", pending_update);
          simple_udp_sendto(&connections[0], info, strlen(info), sender_addr);
          LOG_INFO("   --> Valor recuperado de la variable global: %d\n", pending_update);
-         pending_update = -1;
+         pending_update = 0;
          LOG_INFO("   --> Enviando actualizacion pendiente de flag al SENSOR: %s\n", info);
       } else {
          LOG_INFO("   --> Saltando envio de actualizacion pendiente al SENSOR \n");
@@ -66,8 +68,8 @@ static void udp_rx_callback(struct simple_udp_connection *c, const uip_ipaddr_t 
       // Push new value from REMOTE to MQTT server
       push_mqtt(content, FLAG, SENSOR_ID);
       // Send to REMOTO new flag value
-      // char body1[8];
-      // snprintf(body1, sizeof(body1), "%d:%s", SENSOR_ID, ptr[1]);
+      flags[SENSOR_ID] = atoi(content);
+      LOG_INFO("   --> programando actualizacion del flag del REMOTO: %d:%d\n", flags[SERVER_ID], flags[SENSOR_ID]);
       break;
    case 3:
       LOG_INFO("   --> <msg=3> recibido conmutacion estado de flag de REMOTO: %s\n", content);
@@ -78,6 +80,17 @@ static void udp_rx_callback(struct simple_udp_connection *c, const uip_ipaddr_t 
       char* toSend = body+2;
       pending_update = atoi(toSend);
       LOG_INFO("   --> programando actualizacion del flag del SENSOR: %s\n", toSend);
+      break;
+   case 4:
+      LOG_INFO("   --> <msg=4> recibido peticion de estado de alarmas de REMOTO: %s\n", content);
+      static char info[4];
+      snprintf(info, sizeof(info), "%d:%d", flags[SERVER_ID], flags[SENSOR_ID]);
+      simple_udp_sendto(&connections[1], info, strlen(info), sender_addr);
+      LOG_INFO("   --> Enviando actualizacion pendiente de flag al REMOTO: %s\n", info);
+      for (int i = 0; i < 2; i++) {
+         flags[i] = 0;
+      }
+      
       break;
    default:
       LOG_INFO("   --> No se ha reconocido el codigo del mensaje recibido.\n");

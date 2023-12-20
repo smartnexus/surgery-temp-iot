@@ -7,11 +7,13 @@
 #include "net/netstack.h"
 #include "net/ipv6/simple-udp.h"
 #include "dev/button-hal.h"
+#include "os/sys/process.h"
 
 #include "lib/sensors.h"
 #include "common/temperature-sensor.h"
 
 #include "dev/leds.h"
+#include "dev/etc/rgb-led/rgb-led.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -50,10 +52,14 @@ udp_rx_callback(struct simple_udp_connection *c,
          const uint8_t *data,
          uint16_t datalen)
 {
-  LOG_INFO("Flag RX por el servidor -> '%.*s'.", datalen, (char *) data);   
+  
+  LOG_INFO("Flag RX por el servidor -> '%.*s'.", datalen, (char *) data);
   LOG_INFO_("\n");
 
-  flag = (int) data;
+  char * msj_rx = (char *) data;
+  flag = atoi(msj_rx);
+  LOG_INFO("Almacenado el flag -> '%d'.", flag);
+  LOG_INFO_("\n");
 
 }
 /*---------------------------------------------------------------------------*/
@@ -92,10 +98,12 @@ PROCESS_THREAD(temp_alarm, ev, data)
       LOG_INFO("Not reachable yet\n");
     }
 
+    LOG_INFO("Se comprueba el flag -> '%d'.", flag);
+    LOG_INFO_("\n");
     if (flag == FLAG_ON && (int_tmp_c < UMBRAL_BOTTOM || int_tmp_c > UMBRAL_TOP)){
-      process_poll(&led_blink);
-      process_poll(&button_press);
       flag = FLAG_OFF;
+      process_poll(&led_blink);
+      
     }
 
     SENSORS_DEACTIVATE(temperature_sensor);
@@ -113,7 +121,6 @@ PROCESS_THREAD(led_blink, ev, data)
   uip_ipaddr_t dest_ipaddr;
 
   PROCESS_BEGIN();
-
   /* Initialize UDP connection */
   simple_udp_register(&udp_conn, UDP_CLIENT_PORT, NULL,
                       UDP_SERVER_PORT, udp_rx_callback);
@@ -121,27 +128,26 @@ PROCESS_THREAD(led_blink, ev, data)
   etimer_set(&led_timer, CLOCK_SECOND * 1);
 
   while(1) {
-    
-    PROCESS_WAIT_EVENT_UNTIL(PROCESS_EVENT_POLL);
+    PROCESS_WAIT_EVENT_UNTIL(ev == PROCESS_EVENT_POLL);
     LOG_INFO("Ha saltado la alarma\n");
+  
 
     while (estado_boton == 0){
-      LOG_INFO("LED1 on\n");
-      leds_on(LEDS_YELLOW);
+      rgb_led_set(RGB_LED_RED);
       
-      PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&led_timer));
       etimer_reset(&led_timer);
-      
-      LOG_INFO("LED1 off\n");
-      leds_off(LEDS_YELLOW);
+      PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&led_timer));
 
-      PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&led_timer));
+      rgb_led_off();
+
       etimer_reset(&led_timer);
+      PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&led_timer));
     }
 
     // Nos aseguramos de apagar el LED
     LOG_INFO("LED1 off\n");
-    leds_off(LEDS_YELLOW);
+    rgb_led_off();
+    estado_boton = 0;
 
     // Enviar al servidor el nuevo estado
     if(NETSTACK_ROUTING.node_is_reachable() && NETSTACK_ROUTING.get_root_ipaddr(&dest_ipaddr)) {
@@ -166,14 +172,9 @@ PROCESS_THREAD(button_press, ev, data)
 
   while (1)
   {
+    PROCESS_WAIT_EVENT_UNTIL(ev == button_hal_press_event);
 
-    PROCESS_WAIT_EVENT_UNTIL(PROCESS_EVENT_POLL);
-
-    while (estado_boton == 0){
-      if(ev == button_hal_press_event) {
-        estado_boton = 1;
-      }
-    }
+    estado_boton = 1;
 
     LOG_INFO("Se ha apagado la alarma (boton)\r\n");
   }
