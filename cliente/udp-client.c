@@ -116,9 +116,12 @@ PROCESS_THREAD(temp_alarm, ev, data)
 PROCESS_THREAD(led_blink, ev, data)
 {
   static struct etimer led_timer;
+  static struct etimer alarm_timer;
 
   static char str[32];
   uip_ipaddr_t dest_ipaddr;
+
+  uint16_t estado_alarma_tx = 0;
 
   PROCESS_BEGIN();
   /* Initialize UDP connection */
@@ -126,6 +129,7 @@ PROCESS_THREAD(led_blink, ev, data)
                       UDP_SERVER_PORT, udp_rx_callback);
 
   etimer_set(&led_timer, CLOCK_SECOND * 1);
+  etimer_set(&alarm_timer, CLOCK_SECOND * 3);
 
   while(1) {
     PROCESS_WAIT_EVENT_UNTIL(ev == PROCESS_EVENT_POLL);
@@ -149,15 +153,21 @@ PROCESS_THREAD(led_blink, ev, data)
     rgb_led_off();
     estado_boton = 0;
 
-    // Enviar al servidor el nuevo estado
-    if(NETSTACK_ROUTING.node_is_reachable() && NETSTACK_ROUTING.get_root_ipaddr(&dest_ipaddr)) {
-      /* Send to DAG root */
-      LOG_INFO("Avisando al servidor que se ha apagado la alarma");
-      LOG_INFO_("\n");
-      snprintf(str, sizeof(str), "2>%d", flag);
-      simple_udp_sendto(&udp_conn, str, strlen(str), &dest_ipaddr);
-    } else {
-      LOG_INFO("Not reachable yet\n");
+    while(estado_alarma_tx == 0) {
+      // Enviar al servidor el nuevo estado
+      if(NETSTACK_ROUTING.node_is_reachable() && NETSTACK_ROUTING.get_root_ipaddr(&dest_ipaddr)) {
+        /* Send to DAG root */
+        LOG_INFO("Avisando al servidor que se ha apagado la alarma");
+        LOG_INFO_("\n");
+        snprintf(str, sizeof(str), "2>%d", flag);
+        simple_udp_sendto(&udp_conn, str, strlen(str), &dest_ipaddr);
+        estado_alarma_tx = 1;
+      } else {
+        LOG_INFO("Not reachable yet\n");
+        // Para asegurar que se envia el flag actualizado al servidor
+        etimer_reset(&alarm_timer);
+        PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&alarm_timer));
+      }
     }
 
   }
