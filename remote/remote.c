@@ -2,60 +2,12 @@
  * \file
  *         A Contiki application using the buttons
  * \author
- *        frarosrap, 
+ *        
 */
 
 /*---TODO--------------------------------------------------------------------*/
 
-/*
-  Ahora mismo, el callback de recepcion de paquetes envia una notificacion al 
-  proceso principal para que represente los leds con los datos actualizados.
-
-  Una alternativa podría ser que la representacion la hiciera el callback mismo,
-  pero la variable nodo tendria que ser global.
-*/
-
-/*
-  En caso de que no funcione el callback, se podría poner en un proceso a parte
-  que no se bloquee ¿?¿?. Primero hay que probarlo
-*/
-
-/*
-  Otra cosa que esta en el aire es el parseo, no se si es necesario usar atoi o no.
-*/
-
-//CAMBIOS:
-
-/*
-  El efecto del boton largo se haga antes de que se libere
-*/
-
-/*
-  El cambio de estado tiene que realizarse unicamente si se el mensaje
-*/
-
 /*---Etiquetas---------------------------------------------------------------*/
-
-// Parametros de radio
-
-#define IEEE802154_CONF_PANID 0xaabb
-#define IEEE802154_CONF_DEFAULT_CHANNEL 26
-
-// Uso de logs
-
-#define LOG_MODULE "App"
-#define LOG_LEVEL LOG_LEVEL_INFO
-
-// Parametros del servidor UDP
-
-#define UDP_CLIENT_PORT	6000
-#define UDP_SERVER_PORT	5050
-
-// Definicion de pulsacion larga
-
-#define TIMEOUT_BOTON 2
-#define OFF 1
-#define ON 2
 
 /*---Importaciones-----------------------------------------------------------*/
 
@@ -83,10 +35,10 @@ AUTOSTART_PROCESSES(&main_process,&keepalive_process);
 
 /**
  * \brief Estado de cada uno de los nodos
- *        [OFF : no activo]
- *        [ON : activo]
+ *        [FLAG_OFF : no activo]
+ *        [FLAG_ON : activo]
  */  
-static uint8_t state_nodo[2] = {OFF,OFF};
+static uint8_t state_nodo[2] = {FLAG_OFF,FLAG_OFF};
 
 static struct simple_udp_connection udp_conn;
 
@@ -113,16 +65,16 @@ udp_rx_callback(struct simple_udp_connection *c,
 
   //Parseo de los datos recibidos
   sprintf(str_rx,"%s",(char *) data);
-  valor_recibido[0] = atoi(&str_rx[0]);
-  valor_recibido[1] = atoi(&str_rx[2]);
-  LOG_INFO("Nodo1: %d Nodo2: %d \n\n", valor_recibido[0],valor_recibido[1]);
+  valor_recibido[SERVER_ID] = atoi(&str_rx[0]);
+  valor_recibido[SENSOSR_ID] = atoi(&str_rx[2]);
+  LOG_INFO("Nodo1: %d Nodo2: %d \n\n", valor_recibido[SERVER_ID],valor_recibido[SENSOR_ID]);
 
   //Cambio del valor del flag recibido
-  if (valor_recibido[0]!=0){
-    state_nodo[0] = valor_recibido[0];
+  if (valor_recibido[SERVER_ID]!=0){
+    state_nodo[SERVER_ID] = valor_recibido[SERVER_ID];
   }
-  if (valor_recibido[1]!=0){
-    state_nodo[1] = valor_recibido[1];
+  if (valor_recibido[SENSOR_ID]!=0){
+    state_nodo[SENSOR_ID] = valor_recibido[SENSOR_ID];
   }
 
   //Notificacion al proceso principal para que represente el estado si procede
@@ -136,23 +88,23 @@ udp_rx_callback(struct simple_udp_connection *c,
 static void representacion_leds(uint8_t nodo, uint8_t valor){
 
 // LED del nodo - LED2 RGB
-  if (nodo == 0){
+  if (nodo == SERVER_ID){
     rgb_led_off();
     rgb_led_set(RGB_LED_BLUE);
   }
 
-  if (nodo == 1){
+  if (nodo == SENSOR_ID){
     rgb_led_off();
     rgb_led_set(RGB_LED_MAGENTA);
 
   }
 
 // LED del flag - LED1 VERDE
-  if (valor == OFF){
+  if (valor == FLAG_OFF){
     leds_single_off(LEDS_LED1); //Verde
   }
 
-  if (valor == ON){
+  if (valor == FLAG_ON){
     leds_single_on(LEDS_LED1); //Verde
   }
 
@@ -168,8 +120,8 @@ PROCESS_THREAD(keepalive_process, ev, data)
   PROCESS_BEGIN();
 
   /* Initialize UDP connection */
-  simple_udp_register(&udp_conn, UDP_CLIENT_PORT, NULL,
-                      UDP_SERVER_PORT, udp_rx_callback);
+  simple_udp_register(&udp_conn, REMOTO_PORT, NULL,
+                      SERVIDOR_PORT, udp_rx_callback);
 
   etimer_set(&periodic_timer, CLOCK_SECOND * 10);
 
@@ -206,10 +158,10 @@ PROCESS_THREAD(main_process, ev, data){
 
   /**
    * \brief Nodo a representar
-   *        [0 : nodo 1]
-   *        [1 : nodo 2]
+   *        [SERVER_ID : nodo 1]
+   *        [SENSOR_ID : nodo 2]
    */
-  static uint8_t nodo = 0;
+  static uint8_t nodo = SERVER_ID;
 
   /**
    * \brief Buffer de transmision
@@ -218,17 +170,17 @@ PROCESS_THREAD(main_process, ev, data){
 
   /**
    * \brief Control sobre si ha ocurrido o no la pulsacion larga
-   *        [0 : la pulsacion larga no ha ocurrido]
-   *        [1 : la pulsacion larga ha ocurrido]
+   *        [FALSE : la pulsacion larga no ha ocurrido]
+   *        [TRUE : la pulsacion larga ha ocurrido]
    */
-  static uint8_t pulsacion_larga = 0;
+  static uint8_t pulsacion_larga = FALSE;
 
   /* Comienzo del proceso */
   PROCESS_BEGIN();
 
   /* Initialize UDP connection */
-  simple_udp_register(&udp_conn, UDP_CLIENT_PORT, NULL,
-                      UDP_SERVER_PORT, udp_rx_callback);  
+  simple_udp_register(&udp_conn, REMOTO_PORT, NULL,
+                      SERVIDOR_PORT, udp_rx_callback);  
 
 
   // Representacion inicial
@@ -262,7 +214,7 @@ PROCESS_THREAD(main_process, ev, data){
     /* Evento de boton mantenido */
     // Si el tiempo para la pulsacion larga se ha alcanzado, ya no es 
     // necesario ejecutar de nuevo este bloque
-    if ( ev==button_hal_periodic_event && pulsacion_larga==0){
+    if ( ev==button_hal_periodic_event && pulsacion_larga==FALSE){
       printf("+1 segundo pulsado \n");
       contador = contador + 1;
       printf("   Contador = %d \n",contador);
@@ -270,13 +222,13 @@ PROCESS_THREAD(main_process, ev, data){
       /* Pulsacion larga */
       if (contador>TIMEOUT_BOTON || contador==TIMEOUT_BOTON){
         printf("   Pulsacion larga \n");
-        pulsacion_larga = 1;
+        pulsacion_larga = TRUE;
         
         //Cambio del nodo a representar
-        if (nodo == 0){
-          nodo = 1;
-        }else if (nodo==1){
-          nodo = 0;
+        if (nodo == SERVER_ID){
+          nodo = SENSOR_ID;
+        }else if (nodo==SENSOR_ID){
+          nodo = SERVER_ID;
         }
 
         //Representacion del nodo seleccionado
@@ -284,9 +236,9 @@ PROCESS_THREAD(main_process, ev, data){
         representacion_leds(nodo,state_nodo[nodo]); //Led del nodo y flag
 
         //Logs
-        printf("Nodo actual: %d \n",nodo);
-        printf("Nodo %d : %d \n",0, state_nodo[0]);
-        printf("Nodo %d : %d \n",1, state_nodo[1]);
+        printf("Nodo visible: %d \n",nodo);
+        printf("Nodo %d : %d \n",SERVER_ID, state_nodo[SERVER_ID]);
+        printf("Nodo %d : %d \n",SENSOR_ID, state_nodo[SENSOR_ID]);
 
       }      
       printf("\n");
@@ -305,19 +257,19 @@ PROCESS_THREAD(main_process, ev, data){
         if(NETSTACK_ROUTING.node_is_reachable() && NETSTACK_ROUTING.get_root_ipaddr(&dest_ipaddr)) {
                   
           //Cambio del valor del flag
-          if (state_nodo[nodo] == OFF){
-            state_nodo[nodo] = ON;
-          }else if (state_nodo[nodo]==ON){
-            state_nodo[nodo] = OFF;
+          if (state_nodo[nodo] == FLAG_OFF){
+            state_nodo[nodo] = FLAG_ON;
+          }else if (state_nodo[nodo]==FLAG_ON){
+            state_nodo[nodo] = FLAG_OFF;
           }
 
           //Representacion del nuevo estado del nodo seleccionado
           representacion_leds(nodo,state_nodo[nodo]); //Led del flag
 
           //Logs
-          printf("Nodo actual: %d \n",nodo);
-          printf("Nodo %d : %d \n",0, state_nodo[0]);
-          printf("Nodo %d : %d \n",1, state_nodo[1]);
+          printf("Nodo visible: %d \n",nodo);
+          printf("Nodo %d : %d \n",SERVER_ID, state_nodo[SERVER_ID]);
+          printf("Nodo %d : %d \n",SENSOR_ID, state_nodo[SENSOR_ID]);
 
           /* Send to DAG root */
           LOG_INFO("Enviando el nuevo valor del nodo %d \n",nodo);
@@ -331,7 +283,7 @@ PROCESS_THREAD(main_process, ev, data){
 
       }else{
         // Fin de la punsacion larga
-        pulsacion_larga = 0;
+        pulsacion_larga = FALSE;
       }
       // Reseteo del contador
       contador = 0;
