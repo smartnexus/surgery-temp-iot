@@ -56,8 +56,9 @@ udp_rx_callback(struct simple_udp_connection *c,
 {
   
   char str_rx[4]; //Buffer de recepcion
-  uint8_t valor_recibido[2];
+  uint8_t state_recibido[2];
 
+  printf("\n");
   LOG_INFO("Direccion = ");
   LOG_INFO_6ADDR(sender_addr);
   LOG_INFO_("\n");
@@ -65,16 +66,16 @@ udp_rx_callback(struct simple_udp_connection *c,
 
   //Parseo de los datos recibidos
   sprintf(str_rx,"%s",(char *) data);
-  valor_recibido[SERVER_ID] = atoi(&str_rx[0]);
-  valor_recibido[SENSOSR_ID] = atoi(&str_rx[2]);
-  LOG_INFO("Nodo1: %d Nodo2: %d \n\n", valor_recibido[SERVER_ID],valor_recibido[SENSOR_ID]);
+  state_recibido[SERVER_ID] = atoi(&str_rx[0]);
+  state_recibido[SENSOSR_ID] = atoi(&str_rx[2]);
+  LOG_INFO("Server: %d Sensor: %d \n\n", state_recibido[SERVER_ID],state_recibido[SENSOR_ID]);
 
   //Cambio del valor del flag recibido
-  if (valor_recibido[SERVER_ID]!=0){
-    state_nodo[SERVER_ID] = valor_recibido[SERVER_ID];
+  if (state_recibido[SERVER_ID]!=0){
+    state_nodo[SERVER_ID] = state_recibido[SERVER_ID];
   }
-  if (valor_recibido[SENSOR_ID]!=0){
-    state_nodo[SENSOR_ID] = valor_recibido[SENSOR_ID];
+  if (state_recibido[SENSOR_ID]!=0){
+    state_nodo[SENSOR_ID] = state_recibido[SENSOR_ID];
   }
 
   //Notificacion al proceso principal para que represente el estado si procede
@@ -131,13 +132,14 @@ PROCESS_THREAD(keepalive_process, ev, data)
     if(NETSTACK_ROUTING.node_is_reachable() && NETSTACK_ROUTING.get_root_ipaddr(&dest_ipaddr)) {
 
       /* Send to DAG root */
-      LOG_INFO("\n Enviando KeepAlive \n");
+      printf("\n");
+      LOG_INFO("Enviando KeepAlive \n");
       snprintf(str_tx, sizeof(str_tx), "4>");
       LOG_INFO("   Enviando la cadena '%s' \n\n",str_tx);
       simple_udp_sendto(&udp_conn, str_tx, strlen(str_tx), &dest_ipaddr);
 
     } else {
-      LOG_INFO("Not reachable yet\n");
+      LOG_INFO("KeepAlive > Not reachable yet\n");
     }
     etimer_reset(&periodic_timer);
   }
@@ -215,7 +217,7 @@ PROCESS_THREAD(main_process, ev, data){
     // Si el tiempo para la pulsacion larga se ha alcanzado, ya no es 
     // necesario ejecutar de nuevo este bloque
     if ( ev==button_hal_periodic_event && pulsacion_larga==FALSE){
-      printf("+1 segundo pulsado \n");
+      printf("   +1 segundo pulsado \n");
       contador = contador + 1;
       printf("   Contador = %d \n",contador);
 
@@ -236,9 +238,11 @@ PROCESS_THREAD(main_process, ev, data){
         representacion_leds(nodo,state_nodo[nodo]); //Led del nodo y flag
 
         //Logs
+        printf("------ \n");
         printf("Nodo visible: %d \n",nodo);
         printf("Nodo %d : %d \n",SERVER_ID, state_nodo[SERVER_ID]);
         printf("Nodo %d : %d \n",SENSOR_ID, state_nodo[SENSOR_ID]);
+        printf("------ \n");
 
       }      
       printf("\n");
@@ -267,18 +271,21 @@ PROCESS_THREAD(main_process, ev, data){
           representacion_leds(nodo,state_nodo[nodo]); //Led del flag
 
           //Logs
+          printf("------ \n");
           printf("Nodo visible: %d \n",nodo);
           printf("Nodo %d : %d \n",SERVER_ID, state_nodo[SERVER_ID]);
           printf("Nodo %d : %d \n",SENSOR_ID, state_nodo[SENSOR_ID]);
+          printf("------ \n");
 
           /* Send to DAG root */
+          printf("\n");
           LOG_INFO("Enviando el nuevo valor del nodo %d \n",nodo);
           snprintf(str_tx, sizeof(str_tx), "3>%d:%d",nodo,state_nodo[nodo]);
           LOG_INFO("   Enviando la cadena '%s' \n\n",str_tx);
           simple_udp_sendto(&udp_conn, str_tx, strlen(str_tx), &dest_ipaddr);
 
         } else {
-          LOG_INFO("Not reachable yet\n");
+          LOG_INFO("StateChange> Not reachable yet\n");
         }
 
       }else{
