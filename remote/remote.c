@@ -12,8 +12,8 @@
 /*---Importaciones-----------------------------------------------------------*/
 
 // Etiquetas
-#include "protocol.h"
-#include "sensors.h"
+#include "../common/protocol.h"
+#include "../common/sensors.h"
 
 #include <stdio.h> // printf()
 #include <stdlib.h> // atoi()
