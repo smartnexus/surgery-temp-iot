@@ -247,14 +247,13 @@ PROCESS_THREAD(main_process, ev, data){
         printf("Nodo %d : %d \n",SERVER_ID, state_nodo[SERVER_ID]);
         printf("Nodo %d : %d \n",SENSOR_ID, state_nodo[SENSOR_ID]);
         printf("------ \n");
+        printf("\n");
 
-      }      
-      printf("\n");
+      }
     }
 
     /* Evento de release */
     if ( ev==button_hal_release_event){
-      printf("\n");
       printf("Liberacion de boton \n");      
 
       /* Pulsacion corta */
