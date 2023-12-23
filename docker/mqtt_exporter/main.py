@@ -14,12 +14,12 @@ import serial
 import paho.mqtt.client as mqtt
 from prometheus_client import Counter, Gauge, start_http_server
 
-int TEMPERATURE_C_SERVER = 0
-int TEMPPERATURE_C_SENSOR = 1
-int TEMPERATURE_F_SERVER = 2
-int TEMPPERATURE_F_SENSOR = 3
-int FLAG_SERVER = 4
-int FLAG_SENSOR = 5
+temperature_c_server = 0
+temperature_c_sensor = 1
+temperature_f_server = 2
+temperature_f_sensor = 3
+flag_server = 4
+flag_sensor = 5
 
 logging.basicConfig(filename='register.log', level=logging.DEBUG)
 LOG = logging.getLogger("[mqtt-exporter]")
@@ -33,8 +33,8 @@ prom_temp_c_server_gauge = None
 prom_temp_c_sensor_gauge = None
 prom_temp_f_server_gauge = None
 prom_temp_f_sensor_gauge = None
-prom_temp_flag_server_gauge = None
-prom_temp_flag_sensor_gauge = None
+prom_flag_server_gauge = None
+prom_flag_sensor_gauge = None
 
 
 def create_msg_counter_metrics():
@@ -73,16 +73,16 @@ def create_temp_gauge_f_sensor_metrics():
     )
 
 def create_temp_gauge_flag_server_metrics():
-    global prom_temp_flag_server_gauge
+    global prom_flag_server_gauge
 
-    prom_temp_flag_server_gauge = Gauge( 'flag_server',
+    prom_flag_server_gauge = Gauge( 'flag_server',
         'Flag alarm Server [1->off; 2->on]'
     )
 
 def create_temp_gauge_flag_sensor_metrics():
-    global prom_temp_flag_sensor_gauge
+    global prom_flag_sensor_gauge
 
-    prom_temp_flag_sensor_gauge = Gauge( 'flag_sensor',
+    prom_flag_sensor_gauge = Gauge( 'flag_sensor',
         'Flag alarm Sensor [1->off; 2->on]'
     )
 
@@ -138,10 +138,25 @@ def on_connect(client, _, __, rc):
     print(" Connected with result code: {0:d}".format(rc))
     
     client.subscribe("temp_c_server")
+    if rc != mqtt.CONNACK_ACCEPTED:
+        LOG.error("[ERROR]: MQTT %s", rc)
+        print("[ERROR]: MQTT {0:d}".format(rc))    
     client.subscribe("temp_c_sensor")
+    if rc != mqtt.CONNACK_ACCEPTED:
+        LOG.error("[ERROR]: MQTT %s", rc)
+        print("[ERROR]: MQTT {0:d}".format(rc))    
     client.subscribe("temp_f_server")
+    if rc != mqtt.CONNACK_ACCEPTED:
+        LOG.error("[ERROR]: MQTT %s", rc)
+        print("[ERROR]: MQTT {0:d}".format(rc))    
     client.subscribe("temp_f_sensor")
+    if rc != mqtt.CONNACK_ACCEPTED:
+        LOG.error("[ERROR]: MQTT %s", rc)
+        print("[ERROR]: MQTT {0:d}".format(rc))    
     client.subscribe("flag_server")
+    if rc != mqtt.CONNACK_ACCEPTED:
+        LOG.error("[ERROR]: MQTT %s", rc)
+        print("[ERROR]: MQTT {0:d}".format(rc))
     client.subscribe("flag_sensor")
     if rc != mqtt.CONNACK_ACCEPTED:
         LOG.error("[ERROR]: MQTT %s", rc)
@@ -250,18 +265,19 @@ def main():
             print("Field[{0:d}]: {1:f}".format(index, float(value)))
             index = index + 1
         
+        print(fields)
         # Publish data on corresponding topic
-        if(fields[1] == TEMPERATURE_C_SERVER):
+        if(fields[1] == temperature_c_server):
             client.publish(topic="temp_c_server", payload=fields[0], qos=0, retain=False)
-        if(fields[1] == TEMPERATURE_C_SENSOR):
+        if(fields[1] == temperature_c_sensor):
             client.publish(topic="temp_c_sensor", payload=fields[0], qos=0, retain=False)
-        if(fields[1] == TEMPERATURE_F_SERVER):
+        if(fields[1] == temperature_f_server):
             client.publish(topic="temp_f_server", payload=fields[0], qos=0, retain=False)
-        if(fields[1] == TEMPERATURE_F_SENSOR):
+        if(fields[1] == temperature_f_sensor):
             client.publish(topic="temp_f_sensor", payload=fields[0], qos=0, retain=False)
-        if(fields[1] == FLAG_SERVER):
+        if(fields[1] == flag_server):
             client.publish(topic="flag_server", payload=fields[0], qos=0, retain=False)
-        if(fields[1] == FLAG_SENSOR):
+        if(fields[1] == flag_sensor):
             client.publish(topic="flag_sensor", payload=fields[0], qos=0, retain=False)
 
 

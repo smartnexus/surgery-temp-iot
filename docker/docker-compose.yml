@@ -26,6 +26,8 @@ services:
     ports:
       - 9000:9000
     restart: unless-stopped
+    volumes:
+      - ./mqtt_exporter/main.py:/mqtt-exporter/main.py
 
   prometheus:
     image: prom/prometheus

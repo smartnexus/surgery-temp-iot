@@ -26,7 +26,7 @@
 #define DEVELOPMENT_MODE 100
 #define PRODUCTION_MODE 200
 
-static int mode = DEVELOPMENT_MODE;
+static int mode = PRODUCTION_MODE;
 
 /*-----------------------------SERVIDOR------------------------------------*/
 void push_mqtt(char* data, uint8_t datatype, uint8_t nodeid);
@@ -223,7 +223,7 @@ PROCESS_THREAD(temp_alarm, ev, data) {
       int_tmp_c = raw_tmp >> 2;                  // realiza un desplazamiento de 2 bits a la derecha
       frac_tmp_c = (raw_tmp & 0x3)*25;           // se calcula tomando los 2 bits menos significativos
 
-      snprintf(str, sizeof(str), "1>%d.%d", int_tmp_c, frac_tmp_c);
+      snprintf(str, sizeof(str), "%d.%d", int_tmp_c, frac_tmp_c);
       push_mqtt(str, TEMPERATURE, SERVER_ID);
     
       log("Se comprueba el flag -> '%d'.\n", flag);
