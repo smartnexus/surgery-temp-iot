@@ -71,7 +71,7 @@ udp_rx_callback(struct simple_udp_connection *c,
   //Parseo de los datos recibidos
   sprintf(str_rx,"%s",(char *) data);
   state_recibido[SERVER_ID] = atoi(&str_rx[0]);
-  state_recibido[SENSOSR_ID] = atoi(&str_rx[2]);
+  state_recibido[SENSOR_ID] = atoi(&str_rx[2]);
   LOG_INFO("Server: %d Sensor: %d \n\n", state_recibido[SERVER_ID],state_recibido[SENSOR_ID]);
 
   //Cambio del valor del flag recibido
