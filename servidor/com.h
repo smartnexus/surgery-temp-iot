@@ -5,7 +5,11 @@
 #define SERVER_ID 0
 #define SENSOR_ID 1
 
-#define TEMPERATURE 0
-#define FLAG 1
+#define TEMPERATURE_C_SERVER 0
+#define TEMPPERATURE_C_SENSOR 1
+#define TEMPERATURE_F_SERVER 2
+#define TEMPPERATURE_F_SENSOR 3
+#define FLAG_SERVER 4
+#define FLAG_SENSOR 5
 
 #define MSG_HEAD ">"
