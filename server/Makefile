@@ -1,5 +1,5 @@
-CONTIKI_PROJECT = servidor
+CONTIKI_PROJECT = server
 all: $(CONTIKI_PROJECT)
 
-CONTIKI=../..
+CONTIKI = ../..
 include $(CONTIKI)/Makefile.include

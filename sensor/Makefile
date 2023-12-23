@@ -1,5 +1,4 @@
-CONTIKI_PROJECT = udp-client_temp udp-server_temp
-all: $(CONTIKI_PROJECT)
+CONTIKI_PROJECT = sensor
 
-CONTIKI=../..
+CONTIKI = ../..
 include $(CONTIKI)/Makefile.include
