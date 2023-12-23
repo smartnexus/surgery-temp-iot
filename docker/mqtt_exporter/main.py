@@ -72,14 +72,14 @@ def create_temp_gauge_f_sensor_metrics():
         'Temperature Sensor [Farenheit Degrees]'
     )
 
-def create_temp_gauge_flag_server_metrics():
+def create_gauge_flag_server_metrics():
     global prom_flag_server_gauge
 
     prom_flag_server_gauge = Gauge( 'flag_server',
         'Flag alarm Server [1->off; 2->on]'
     )
 
-def create_temp_gauge_flag_sensor_metrics():
+def create_gauge_flag_sensor_metrics():
     global prom_flag_sensor_gauge
 
     prom_flag_sensor_gauge = Gauge( 'flag_sensor',
@@ -137,26 +137,11 @@ def on_connect(client, _, __, rc):
     LOG.info(" Connected with result code: %s", rc)
     print(" Connected with result code: {0:d}".format(rc))
     
-    client.subscribe("temp_c_server")
-    if rc != mqtt.CONNACK_ACCEPTED:
-        LOG.error("[ERROR]: MQTT %s", rc)
-        print("[ERROR]: MQTT {0:d}".format(rc))    
-    client.subscribe("temp_c_sensor")
-    if rc != mqtt.CONNACK_ACCEPTED:
-        LOG.error("[ERROR]: MQTT %s", rc)
-        print("[ERROR]: MQTT {0:d}".format(rc))    
-    client.subscribe("temp_f_server")
-    if rc != mqtt.CONNACK_ACCEPTED:
-        LOG.error("[ERROR]: MQTT %s", rc)
-        print("[ERROR]: MQTT {0:d}".format(rc))    
-    client.subscribe("temp_f_sensor")
-    if rc != mqtt.CONNACK_ACCEPTED:
-        LOG.error("[ERROR]: MQTT %s", rc)
-        print("[ERROR]: MQTT {0:d}".format(rc))    
+    client.subscribe("temp_c_server")    
+    client.subscribe("temp_c_sensor")   
+    client.subscribe("temp_f_server")   
+    client.subscribe("temp_f_sensor") 
     client.subscribe("flag_server")
-    if rc != mqtt.CONNACK_ACCEPTED:
-        LOG.error("[ERROR]: MQTT %s", rc)
-        print("[ERROR]: MQTT {0:d}".format(rc))
     client.subscribe("flag_sensor")
     if rc != mqtt.CONNACK_ACCEPTED:
         LOG.error("[ERROR]: MQTT %s", rc)
@@ -232,8 +217,8 @@ def main():
     create_temp_gauge_c_sensor_metrics()
     create_temp_gauge_f_server_metrics()
     create_temp_gauge_f_sensor_metrics()
-    create_temp_gauge_flag_server_metrics()
-    create_temp_gauge_flag_sensor_metrics()
+    create_gauge_flag_server_metrics()
+    create_gauge_flag_sensor_metrics()
 
     # Start prometheus server
     start_http_server(9000)
