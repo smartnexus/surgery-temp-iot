@@ -14,6 +14,7 @@
 #include "common/temperature-sensor.h"
 
 #include <stdio.h>
+#include <stdarg.h>
 #include <stdlib.h>
 
 #include "sys/log.h"
@@ -29,6 +30,8 @@ static int mode = DEVELOPMENT_MODE;
 
 /*-----------------------------SERVIDOR------------------------------------*/
 void push_mqtt(char* data, uint8_t datatype, uint8_t nodeid);
+void log(const char* fmt, ...);
+void convert_f(char* value, char* dest);
 
 static struct simple_udp_connection connections[2];
 int ports[2] = {SENSOR_PORT, REMOTO_PORT};
@@ -45,39 +48,68 @@ PROCESS(led_blink, "Parpadeo del LED y apagar alarma");
 PROCESS(button_press, "Boton");
 AUTOSTART_PROCESSES(&udp_server_process, &temp_alarm, &led_blink, &button_press);
 /*---------------------------------------------------------------------------*/
+void convert_f(char* value, char* dest) {
+   char* beg = value;
+   beg[2] = '\0';
+   int16_t int_tmp_c = atoi(beg);
+   int16_t frac_tmp_c = atoi(beg+3);
+
+   int16_t int_tmp_f = 0;
+   int16_t frac_tmp_f = 0;
+   float aux1 = 0;
+
+   /* Conversion de la temperatura celsius a fahrenheit */
+   aux1 = (float)frac_tmp_c / (float)50;
+   //printf("%d",(uint16_t)aux1);
+   int_tmp_f = 2*int_tmp_c + 32 + (uint16_t)aux1;
+   frac_tmp_f =  (uint16_t) 100*(aux1 - (float)(uint16_t)aux1);
+
+   sprintf(dest, "%d.%d", int_tmp_f, frac_tmp_f);
+}
+void log(const char* fmt, ...) {
+   if(mode == DEVELOPMENT_MODE) {
+      va_list args;                     
+      va_start(args, fmt);
+      LOG_INFO_("#");              
+      LOG_INFO(fmt, args);  
+      va_end(args);         
+   }
+}
 void push_mqtt(char* data, uint8_t datatype, uint8_t nodeid) {
-   if (mode == DEVELOPMENT_MODE) {
-      LOG_INFO("[*] Mensaje enviado para MQTT EXPORTER\n");
-      LOG_INFO("   --> Mandando datos por puerto serie para lectura MQTT.\n");
-      LOG_INFO("   --> %s - %d - %d <\n", data, datatype, nodeid);
-   } else {
-      uint8_t message_sender_code = 0;
+   log("[*] Mensaje enviado para MQTT EXPORTER\n");
+   log("   --> Mandando datos por puerto serie para lectura MQTT.\n");
+   log("   --> %s - %d - %d <\n", data, datatype, nodeid);
+   if(mode == PRODUCTION_MODE) {
       switch(nodeid) {
       case SENSOR_ID:
          if (datatype == FLAG) {
-            message_sender_code = FLAG_SENSOR
+            printf("%s;%d\n", data, FLAG_SENSOR);
+         } else if(datatype == TEMPERATURE) {
+            printf("%s;%d\n", data, TEMPERATURE_C_SENSOR);
+            char toSend[4];
+            convert_f(data, toSend);
+            printf("%s;%d\n", toSend, TEMPERATURE_F_SENSOR);
          }
          break;
-      case SEVER_ID:
+      case SERVER_ID:
          if (datatype == FLAG) {
-            message_sender_code = FLAG_SENSOR
+            printf("%s;%d\n", data, FLAG_SERVER);
+         } else if(datatype == TEMPERATURE) {
+            printf("%s;%d\n", data, TEMPERATURE_C_SERVER);
+            char toSend[4];
+            convert_f(data, toSend);
+            printf("%s;%d\n", toSend, TEMPERATURE_F_SERVER);
          }
          break;
       default:
+         printf("%s;%d\n", data, -1);
          break;
       }
-      printf("%s;\n", data, )
-      //TODO: enviar por puerto serie los datos
    }
 }
 static void udp_rx_callback(struct simple_udp_connection *c, const uip_ipaddr_t *sender_addr, uint16_t sender_port, const uip_ipaddr_t *receiver_addr, uint16_t receiver_port, const uint8_t *data, uint16_t datalen) {
-   if (mode == DEVELOPMENT_MODE) {
-      printf("\n");
-      LOG_INFO("[*] Mensaje recibido: ('%.*s')\n", datalen, (char *) data);
-      LOG_INFO("[*] Direccion origen (");
-      LOG_INFO_6ADDR(sender_addr);
-      LOG_INFO_(")\n");
-   }
+   log("\n");
+   log("[*] Mensaje recibido: ('%.*s')\n", datalen, (char *) data);
 
    char* mensaje = (char *) data;
    snprintf(mensaje, datalen+1, "%s", (char *) data);
@@ -86,36 +118,30 @@ static void udp_rx_callback(struct simple_udp_connection *c, const uip_ipaddr_t 
 
    switch (message_code) {
    case 1:
-      if (mode == DEVELOPMENT_MODE)
-         LOG_INFO("   --> <msg=1> recibida medida de temperatura: %s\n", content);
+      log("   --> <msg=1> recibida medida de temperatura: %s\n", content);
       push_mqtt(content, TEMPERATURE, SENSOR_ID);
       // Send pending flag updates to SENSOR
       if(pending_update != 0) {
          static char info[2];
          snprintf(info, sizeof(info), "%d", pending_update);
          simple_udp_sendto(&connections[0], info, strlen(info), sender_addr);
-         if (mode == DEVELOPMENT_MODE)
-            LOG_INFO("   --> Valor recuperado de la variable global: %d\n", pending_update);
+         log("   --> Valor recuperado de la variable global: %d\n", pending_update);
          pending_update = 0;
-         if (mode == DEVELOPMENT_MODE)
-            LOG_INFO("   --> Enviando actualizacion pendiente de flag al SENSOR: %s\n", info);
+         log("   --> Enviando actualizacion pendiente de flag al SENSOR: %s\n", info);
       } else {
-         if (mode == DEVELOPMENT_MODE)
-            LOG_INFO("   --> Saltando envio de actualizacion pendiente al SENSOR \n");
+         log("   --> Saltando envio de actualizacion pendiente al SENSOR \n");
       }
       break;
    case 2:
-      if (mode == DEVELOPMENT_MODE)
-         LOG_INFO("   --> <msg=2> recibido conmutacion estado de flag de SENSOR: %s\n", content);
+      log("   --> <msg=2> recibido conmutacion estado de flag de SENSOR: %s\n", content);
       // Push new value from REMOTE to MQTT server
-      // push_mqtt(content, FLAG, SENSOR_ID);
+      push_mqtt(content, FLAG, SENSOR_ID);
       // Send to REMOTO new flag value
       flags[SENSOR_ID] = atoi(content);
-      // LOG_INFO("   --> programando actualizacion del flag del REMOTO: %d:%d\n", flags[SERVER_ID], flags[SENSOR_ID]);
+      log("   --> programando actualizacion del flag del REMOTO: %d:%d\n", flags[SERVER_ID], flags[SENSOR_ID]);
       break;
    case 3: ;
-      if (mode == DEVELOPMENT_MODE)
-         LOG_INFO("   --> <msg=3> recibido conmutacion estado de flag de REMOTO: %s\n", content);
+      log("   --> <msg=3> recibido conmutacion estado de flag de REMOTO: %s\n", content);
       // Push new value from REMOTE to MQTT server
       char* cuerpo = content;
       uint8_t nodeID = atoi(&content[0]);
@@ -125,33 +151,28 @@ static void udp_rx_callback(struct simple_udp_connection *c, const uip_ipaddr_t 
       switch (nodeID) {
       case SERVER_ID:
          flag = atoi(toSend);
-         if (mode == DEVELOPMENT_MODE)
-            LOG_INFO("   --> programando actualizacion del flag del SERVIDOR: %s\n", toSend);
+         log("   --> programando actualizacion del flag del SERVIDOR: %s\n", toSend);
          break;
       case SENSOR_ID:
          pending_update = atoi(toSend);
-         if (mode == DEVELOPMENT_MODE)
-            LOG_INFO("   --> programando actualizacion del flag del SENSOR: %s\n", toSend);
+         log("   --> programando actualizacion del flag del SENSOR: %s\n", toSend);
          break;
       default:
          break;
       }
       break;
    case 4: ;
-      if (mode == DEVELOPMENT_MODE)
-         LOG_INFO("   --> <msg=4> recibido peticion de estado de alarmas de REMOTO: %s\n", content);
+      log("   --> <msg=4> recibido peticion de estado de alarmas de REMOTO: %s\n", content);
       static char info[4];
       snprintf(info, sizeof(info), "%d:%d", flags[SERVER_ID], flags[SENSOR_ID]);
       simple_udp_sendto(&connections[1], info, strlen(info), sender_addr);
-      if (mode == DEVELOPMENT_MODE)
-         LOG_INFO("   --> Enviando actualizacion pendiente de flag al REMOTO: %s\n", info);
+      log("   --> Enviando actualizacion pendiente de flag al REMOTO: %s\n", info);
       for (int i = 0; i < 2; i++) {
          flags[i] = 0;
       }
       break;
    default:
-      if (mode == DEVELOPMENT_MODE)
-         LOG_INFO("   --> No se ha reconocido el codigo del mensaje recibido.\n");
+      log("   --> No se ha reconocido el codigo del mensaje recibido.\n");
       break;
    }
 }
@@ -162,8 +183,7 @@ PROCESS_THREAD(udp_server_process, ev, data) {
    /* Timeout de arranque inicial */
    etimer_set(&periodic_timer, 10 * CLOCK_SECOND);
    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&periodic_timer));
-   if (mode == DEVELOPMENT_MODE)
-      LOG_INFO("[*] Iniciando el programa...\n");
+   log("[*] Iniciando el programa...\n");
 
    /* Initialize DAG root */
    NETSTACK_ROUTING.root_start();
@@ -172,8 +192,7 @@ PROCESS_THREAD(udp_server_process, ev, data) {
    for (uint8_t i = 0; i < 2; i++) {
       simple_udp_register(&connections[i], SERVIDOR_PORT, NULL, ports[i], udp_rx_callback);
    }
-   if (mode == DEVELOPMENT_MODE)
-      LOG_INFO("[*] Conexiones UDP registradas con sensor y remoto.\n");
+   log("[*] Conexiones UDP registradas con sensor y remoto.\n");
 
    etimer_set(&periodic_timer, 0.5 * CLOCK_SECOND);
    while (true) {
@@ -197,7 +216,7 @@ PROCESS_THREAD(temp_alarm, ev, data) {
 
    etimer_set(&periodic_timer, CLOCK_SECOND * 10);
    while(1) {
-      ROCESS_WAIT_EVENT_UNTIL(etimer_expired(&periodic_timer));
+      PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&periodic_timer));
       SENSORS_ACTIVATE(temperature_sensor);
 
       raw_tmp = (int16_t) temperature_sensor.value(0);
@@ -205,10 +224,9 @@ PROCESS_THREAD(temp_alarm, ev, data) {
       frac_tmp_c = (raw_tmp & 0x3)*25;           // se calcula tomando los 2 bits menos significativos
 
       snprintf(str, sizeof(str), "1>%d.%d", int_tmp_c, frac_tmp_c);
-      // push_mqtt(str, TEMPERATURE, SERVER_ID);
+      push_mqtt(str, TEMPERATURE, SERVER_ID);
     
-      if (mode == DEVELOPMENT_MODE)
-         LOG_INFO("Se comprueba el flag -> '%d'.\n", flag);
+      log("Se comprueba el flag -> '%d'.\n", flag);
       if (flag == FLAG_ON && (int_tmp_c < UMBRAL_BOTTOM || int_tmp_c > UMBRAL_TOP)){
          flag = FLAG_OFF;
          process_poll(&led_blink);     
@@ -229,8 +247,7 @@ PROCESS_THREAD(led_blink, ev, data) {
 
    while(1) {
       PROCESS_WAIT_EVENT_UNTIL(ev == PROCESS_EVENT_POLL);
-      if (mode == DEVELOPMENT_MODE)
-         LOG_INFO("Ha saltado la alarma\n");
+      log("Ha saltado la alarma\n");
   
 
       while (estado_boton == 0){
@@ -246,8 +263,7 @@ PROCESS_THREAD(led_blink, ev, data) {
       }
 
       // Nos aseguramos de apagar el LED
-      if (mode == DEVELOPMENT_MODE)
-         LOG_INFO("LED1 off\n");
+      log("LED1 off\n");
       rgb_led_off();
       estado_boton = 0;
 
@@ -260,8 +276,7 @@ PROCESS_THREAD(button_press, ev, data) {
    while (1) {
       PROCESS_WAIT_EVENT_UNTIL(ev == button_hal_press_event);
       estado_boton = 1;
-      if (mode == DEVELOPMENT_MODE)
-         LOG_INFO("Se ha apagado la alarma (boton)\r\n");
+      log("Se ha apagado la alarma (boton)\r\n");
    }
    PROCESS_END();
 }

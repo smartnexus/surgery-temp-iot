@@ -15,11 +15,15 @@
 #define TRUE 1
 #define FALSE 0
 
+// Definiciones internas server
+#define FLAG 0
+#define TEMPERATURE 1
+
 // Definiciones de mqtt topics
 #define TEMPERATURE_C_SERVER 0
-#define TEMPPERATURE_C_SENSOR 1
+#define TEMPERATURE_C_SENSOR 1
 #define TEMPERATURE_F_SERVER 2
-#define TEMPPERATURE_F_SENSOR 3
+#define TEMPERATURE_F_SENSOR 3
 #define FLAG_SERVER 4
 #define FLAG_SENSOR 5
 
