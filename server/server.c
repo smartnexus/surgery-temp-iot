@@ -22,15 +22,8 @@
 #define LOG_LEVEL LOG_LEVEL_INFO
 
 #include "../common/sensors.h"
-
-#define DEVELOPMENT_MODE 100
-#define PRODUCTION_MODE 200
-
-static int mode = PRODUCTION_MODE;
-
 /*-----------------------------SERVIDOR------------------------------------*/
 void push_mqtt(char* data, uint8_t datatype, uint8_t nodeid);
-void log(const char* fmt, ...);
 void convert_f(char* value, char* dest);
 
 static struct simple_udp_connection connections[2];
@@ -66,50 +59,40 @@ void convert_f(char* value, char* dest) {
 
    sprintf(dest, "%d.%d", int_tmp_f, frac_tmp_f);
 }
-void log(const char* fmt, ...) {
-   if(mode == DEVELOPMENT_MODE) {
-      va_list args;                     
-      va_start(args, fmt);
-      LOG_INFO_("#");              
-      LOG_INFO(fmt, args);  
-      va_end(args);         
-   }
-}
 void push_mqtt(char* data, uint8_t datatype, uint8_t nodeid) {
-   log("[*] Mensaje enviado para MQTT EXPORTER\n");
-   log("   --> Mandando datos por puerto serie para lectura MQTT.\n");
-   log("   --> %s - %d - %d <\n", data, datatype, nodeid);
-   if(mode == PRODUCTION_MODE) {
-      switch(nodeid) {
-      case SENSOR_ID:
-         if (datatype == FLAG) {
-            printf("%s;%d\n", data, FLAG_SENSOR);
-         } else if(datatype == TEMPERATURE) {
-            printf("%s;%d\n", data, TEMPERATURE_C_SENSOR);
-            char toSend[4];
-            convert_f(data, toSend);
-            printf("%s;%d\n", toSend, TEMPERATURE_F_SENSOR);
-         }
-         break;
-      case SERVER_ID:
-         if (datatype == FLAG) {
-            printf("%s;%d\n", data, FLAG_SERVER);
-         } else if(datatype == TEMPERATURE) {
-            printf("%s;%d\n", data, TEMPERATURE_C_SERVER);
-            char toSend[4];
-            convert_f(data, toSend);
-            printf("%s;%d\n", toSend, TEMPERATURE_F_SERVER);
-         }
-         break;
-      default:
-         printf("%s;%d\n", data, -1);
-         break;
+   LOG_INFO("[*] Mensaje enviado para MQTT EXPORTER\n");
+   LOG_INFO("   --> Mandando datos por puerto serie para lectura MQTT.\n");
+   LOG_INFO("   --> %s - %d - %d <\n", data, datatype, nodeid);
+   // Using character "#" to differ between logs and communication protocol
+   switch(nodeid) {
+   case SENSOR_ID:
+      if (datatype == FLAG) {
+         printf("[#] %s;%d\n", data, FLAG_SENSOR);
+      } else if(datatype == TEMPERATURE) {
+         printf("[#] %s;%d\n", data, TEMPERATURE_C_SENSOR);
+         char toSend[4];
+         convert_f(data, toSend);
+         printf("[#] %s;%d\n", toSend, TEMPERATURE_F_SENSOR);
       }
+      break;
+   case SERVER_ID:
+      if (datatype == FLAG) {
+         printf("[#] %s;%d\n", data, FLAG_SERVER);
+      } else if(datatype == TEMPERATURE) {
+         printf("[#] %s;%d\n", data, TEMPERATURE_C_SERVER);
+         char toSend[4];
+         convert_f(data, toSend);
+         printf("[#] %s;%d\n", toSend, TEMPERATURE_F_SERVER);
+      }
+      break;
+   default:
+      printf("[#] %s;%d\n", data, -1);
+      break;
    }
 }
 static void udp_rx_callback(struct simple_udp_connection *c, const uip_ipaddr_t *sender_addr, uint16_t sender_port, const uip_ipaddr_t *receiver_addr, uint16_t receiver_port, const uint8_t *data, uint16_t datalen) {
-   log("\n");
-   log("[*] Mensaje recibido: ('%.*s')\n", datalen, (char *) data);
+   LOG_INFO("\n");
+   LOG_INFO("[*] Mensaje recibido: ('%.*s')\n", datalen, (char *) data);
 
    char* mensaje = (char *) data;
    snprintf(mensaje, datalen+1, "%s", (char *) data);
@@ -118,30 +101,30 @@ static void udp_rx_callback(struct simple_udp_connection *c, const uip_ipaddr_t 
 
    switch (message_code) {
    case 1:
-      log("   --> <msg=1> recibida medida de temperatura: %s\n", content);
+      LOG_INFO("   --> <msg=1> recibida medida de temperatura: %s\n", content);
       push_mqtt(content, TEMPERATURE, SENSOR_ID);
       // Send pending flag updates to SENSOR
       if(pending_update != 0) {
          static char info[2];
          snprintf(info, sizeof(info), "%d", pending_update);
          simple_udp_sendto(&connections[0], info, strlen(info), sender_addr);
-         log("   --> Valor recuperado de la variable global: %d\n", pending_update);
+         LOG_INFO("   --> Valor recuperado de la variable global: %d\n", pending_update);
          pending_update = 0;
-         log("   --> Enviando actualizacion pendiente de flag al SENSOR: %s\n", info);
+         LOG_INFO("   --> Enviando actualizacion pendiente de flag al SENSOR: %s\n", info);
       } else {
-         log("   --> Saltando envio de actualizacion pendiente al SENSOR \n");
+         LOG_INFO("   --> Saltando envio de actualizacion pendiente al SENSOR \n");
       }
       break;
    case 2:
-      log("   --> <msg=2> recibido conmutacion estado de flag de SENSOR: %s\n", content);
+      LOG_INFO("   --> <msg=2> recibido conmutacion estado de flag de SENSOR: %s\n", content);
       // Push new value from REMOTE to MQTT server
       push_mqtt(content, FLAG, SENSOR_ID);
       // Send to REMOTO new flag value
       flags[SENSOR_ID] = atoi(content);
-      log("   --> programando actualizacion del flag del REMOTO: %d:%d\n", flags[SERVER_ID], flags[SENSOR_ID]);
+      LOG_INFO("   --> programando actualizacion del flag del REMOTO: %d:%d\n", flags[SERVER_ID], flags[SENSOR_ID]);
       break;
    case 3: ;
-      log("   --> <msg=3> recibido conmutacion estado de flag de REMOTO: %s\n", content);
+      LOG_INFO("   --> <msg=3> recibido conmutacion estado de flag de REMOTO: %s\n", content);
       // Push new value from REMOTE to MQTT server
       char* cuerpo = content;
       uint8_t nodeID = atoi(&content[0]);
@@ -151,28 +134,28 @@ static void udp_rx_callback(struct simple_udp_connection *c, const uip_ipaddr_t 
       switch (nodeID) {
       case SERVER_ID:
          flag = atoi(toSend);
-         log("   --> programando actualizacion del flag del SERVIDOR: %s\n", toSend);
+         LOG_INFO("   --> programando actualizacion del flag del SERVIDOR: %s\n", toSend);
          break;
       case SENSOR_ID:
          pending_update = atoi(toSend);
-         log("   --> programando actualizacion del flag del SENSOR: %s\n", toSend);
+         LOG_INFO("   --> programando actualizacion del flag del SENSOR: %s\n", toSend);
          break;
       default:
          break;
       }
       break;
    case 4: ;
-      log("   --> <msg=4> recibido peticion de estado de alarmas de REMOTO: %s\n", content);
+      LOG_INFO("   --> <msg=4> recibido peticion de estado de alarmas de REMOTO: %s\n", content);
       static char info[4];
       snprintf(info, sizeof(info), "%d:%d", flags[SERVER_ID], flags[SENSOR_ID]);
       simple_udp_sendto(&connections[1], info, strlen(info), sender_addr);
-      log("   --> Enviando actualizacion pendiente de flag al REMOTO: %s\n", info);
+      LOG_INFO("   --> Enviando actualizacion pendiente de flag al REMOTO: %s\n", info);
       for (int i = 0; i < 2; i++) {
          flags[i] = 0;
       }
       break;
    default:
-      log("   --> No se ha reconocido el codigo del mensaje recibido.\n");
+      LOG_INFO("   --> No se ha reconocido el codigo del mensaje recibido.\n");
       break;
    }
 }
@@ -183,7 +166,7 @@ PROCESS_THREAD(udp_server_process, ev, data) {
    /* Timeout de arranque inicial */
    etimer_set(&periodic_timer, 10 * CLOCK_SECOND);
    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&periodic_timer));
-   log("[*] Iniciando el programa...\n");
+   LOG_INFO("[*] Iniciando el programa...\n");
 
    /* Initialize DAG root */
    NETSTACK_ROUTING.root_start();
@@ -192,7 +175,7 @@ PROCESS_THREAD(udp_server_process, ev, data) {
    for (uint8_t i = 0; i < 2; i++) {
       simple_udp_register(&connections[i], SERVIDOR_PORT, NULL, ports[i], udp_rx_callback);
    }
-   log("[*] Conexiones UDP registradas con sensor y remoto.\n");
+   LOG_INFO("[*] Conexiones UDP registradas con sensor y remoto.\n");
 
    etimer_set(&periodic_timer, 0.5 * CLOCK_SECOND);
    while (true) {
@@ -226,7 +209,7 @@ PROCESS_THREAD(temp_alarm, ev, data) {
       snprintf(str, sizeof(str), "%d.%d", int_tmp_c, frac_tmp_c);
       push_mqtt(str, TEMPERATURE, SERVER_ID);
     
-      log("Se comprueba el flag -> '%d'.\n", flag);
+      LOG_INFO("Se comprueba el flag -> '%d'.\n", flag);
       if (flag == FLAG_ON && (int_tmp_c < UMBRAL_BOTTOM || int_tmp_c > UMBRAL_TOP)){
          flag = FLAG_OFF;
          process_poll(&led_blink);     
@@ -247,7 +230,7 @@ PROCESS_THREAD(led_blink, ev, data) {
 
    while(1) {
       PROCESS_WAIT_EVENT_UNTIL(ev == PROCESS_EVENT_POLL);
-      log("Ha saltado la alarma\n");
+      LOG_INFO("Ha saltado la alarma\n");
   
 
       while (estado_boton == 0){
@@ -263,7 +246,7 @@ PROCESS_THREAD(led_blink, ev, data) {
       }
 
       // Nos aseguramos de apagar el LED
-      log("LED1 off\n");
+      LOG_INFO("LED1 off\n");
       rgb_led_off();
       estado_boton = 0;
 
@@ -276,7 +259,7 @@ PROCESS_THREAD(button_press, ev, data) {
    while (1) {
       PROCESS_WAIT_EVENT_UNTIL(ev == button_hal_press_event);
       estado_boton = 1;
-      log("Se ha apagado la alarma (boton)\r\n");
+      LOG_INFO("Se ha apagado la alarma (boton)\r\n");
    }
    PROCESS_END();
 }
