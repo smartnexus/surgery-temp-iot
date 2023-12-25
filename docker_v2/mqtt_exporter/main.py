@@ -21,12 +21,12 @@ LOG = logging.getLogger("[mqtt-exporter]")
 # Shorcuts
 ########################################################################
 
-temperature_c_server = 0
-temperature_c_sensor = 1
-temperature_f_server = 2
-temperature_f_sensor = 3
-flag_server = 4
-flag_sensor = 5
+temperature_c_server = b'0'
+temperature_c_sensor = b'1'
+temperature_f_server = b'2'
+temperature_f_sensor = b'3'
+flag_server = b'4'
+flag_sensor = b'5'
 
 ########################################################################
 # Prometheus
@@ -241,15 +241,17 @@ def main():
         line = ser.readline()
         # Print data received
         content = line.rstrip()
-        if content.startswith("[#]"):
+        if content.startswith(b'[#]'):
             LOG.debug("Serial Data: %s", str(line, 'ascii').rstrip())
             print("Serial Data: {0:s}".format(str(line, 'ascii').rstrip()))
+            
             # Get data, remove prefix
             body = content[len("[#] "):]
             [value,type] = body.split(b';')
+            print("Tipo", type, "valor", value)
+
             # Identify topic
             topic = None
-            # Publish data on corresponding topic
             if(type == temperature_c_server):
                 topic = "temp_c_server"
             elif(type == temperature_c_sensor):
@@ -264,8 +266,10 @@ def main():
                 topic = "flag_sensor"
             
             # Publish data on corresponding topic
+            print("Sending to ", topic, "value", value)
             client.publish(topic=topic, payload=value, qos=0, retain=False)
-            print("Sending to", topic, "value", value)
+            print("Done")
+            
 
 
 ########################################################################

@@ -2,7 +2,7 @@
 ## Contenedor "mqtt_exporter"
 Este contenedor no ejecuta de por si el script de Python al iniciarse (de ahi viene el bug de que se quede pillado y no reciba nada), para ejecutar el script es necesario realizar los siguientes pasos:
 ```bash
-$ vmu@vm-devel: docker compose exec mqtt_exporter /bin/sh
+$ vmu@vm-devel: docker compose exec mqtt-exporter /bin/sh
 ```
 ```bash
 $ /mqtt-exporter: python3 main.py
