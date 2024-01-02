@@ -109,7 +109,7 @@ static void udp_rx_callback(struct simple_udp_connection *c, const uip_ipaddr_t 
       push_mqtt(content, TEMPERATURE, SENSOR_ID);
       // Send pending flag updates to SENSOR
       if(pending_update != 0) {
-         static char info[2];
+         char info[2];
          snprintf(info, sizeof(info), "%d", pending_update);
          simple_udp_sendto(&connections[0], info, strlen(info), sender_addr);
          LOG_INFO("   --> Valor recuperado de la variable global: %d\n", pending_update);
@@ -150,12 +150,15 @@ static void udp_rx_callback(struct simple_udp_connection *c, const uip_ipaddr_t 
       break;
    case 4: ;
       LOG_INFO("   --> <msg=4> recibido peticion de estado de alarmas de REMOTO: %s\n", content);
-      static char info[4];
+      char info[4];
       snprintf(info, sizeof(info), "%d:%d", flags[SERVER_ID], flags[SENSOR_ID]);
+      printf("INFO: %s \n",info);
+      printf("FLAG 1: %d \n",flags[SERVER_ID]);
+      printf("FLAG 2: %d \n",flags[SENSOR_ID]);
       simple_udp_sendto(&connections[1], info, strlen(info), sender_addr);
       LOG_INFO("   --> Enviando actualizacion pendiente de flag al REMOTO: %s\n", info);
       for (int i = 0; i < 2; i++) {
-         flags[i] = 0;
+         flags[i] = (int) 0;
       }
       break;
    default:
@@ -255,7 +258,8 @@ PROCESS_THREAD(led_blink, ev, data) {
       rgb_led_off();
       estado_boton = 0;
 
-      flags[SERVER_ID] = flag;
+      flags[SERVER_ID] = (int) flag;
+      printf("ABAJO flag: %d \n",flags[SERVER_ID]);
    }   
    PROCESS_END();
 }
