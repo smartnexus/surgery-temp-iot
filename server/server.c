@@ -31,9 +31,16 @@ int ports[2] = {SENSOR_PORT, REMOTO_PORT};
 
 int8_t pending_update = 0;
 int flags[2] = {0,0};
+
+static char field[4];
 /*------------------------------SENSOR------------------------------------*/
 static int flag = FLAG_OFF;
 static int estado_boton = 0;
+static int16_t int_temp_c;
+static int16_t frac_temp_c;
+static int16_t int_temp_f;
+static int16_t frac_temp_f;
+static float aux1;
 /*---------------------------------------------------------------------------*/
 PROCESS(udp_server_process, "UDP server");
 PROCESS(temp_alarm, "Lectura del sensor de temperatura -> envio al servidor + threshold -> alarma");
@@ -44,20 +51,19 @@ AUTOSTART_PROCESSES(&udp_server_process, &temp_alarm, &led_blink, &button_press)
 void convert_f(char* value, char* dest) {
    char* beg = value;
    beg[2] = '\0';
-   int16_t int_tmp_c = atoi(beg);
-   int16_t frac_tmp_c = atoi(beg+3);
+   int_temp_c = atoi(beg);
+   frac_temp_c = atoi(beg+3);
 
-   int16_t int_tmp_f = 0;
-   int16_t frac_tmp_f = 0;
-   float aux1 = 0;
+   int_temp_f = 0;
+   frac_temp_f = 0;
 
    /* Conversion de la temperatura celsius a fahrenheit */
-   aux1 = (float)frac_tmp_c / (float)50;
+   aux1 = (float)frac_temp_c / (float)50;
    //printf("%d",(uint16_t)aux1);
-   int_tmp_f = 2*int_tmp_c + 32 + (uint16_t)aux1;
-   frac_tmp_f =  (uint16_t) 100*(aux1 - (float)(uint16_t)aux1);
+   int_temp_f = 2*int_temp_c + 32 + (uint16_t)aux1;
+   frac_temp_f =  (uint16_t) 100*(aux1 - (float)(uint16_t)aux1);
 
-   sprintf(dest, "%d.%d", int_tmp_f, frac_tmp_f);
+   sprintf(dest, "%d.%d", int_temp_f, frac_temp_f);
 }
 void push_mqtt(char* data, uint8_t datatype, uint8_t nodeid) {
    LOG_INFO("[*] Mensaje enviado para MQTT EXPORTER\n");
@@ -70,9 +76,8 @@ void push_mqtt(char* data, uint8_t datatype, uint8_t nodeid) {
          printf("[#] %s;%d\n", data, FLAG_SENSOR);
       } else if(datatype == TEMPERATURE) {
          printf("[#] %s;%d\n", data, TEMPERATURE_C_SENSOR);
-         char toSend[4];
-         convert_f(data, toSend);
-         printf("[#] %s;%d\n", toSend, TEMPERATURE_F_SENSOR);
+         convert_f(data, field);
+         printf("[#] %s;%d\n", field, TEMPERATURE_F_SENSOR);
       }
       break;
    case SERVER_ID:
@@ -80,9 +85,8 @@ void push_mqtt(char* data, uint8_t datatype, uint8_t nodeid) {
          printf("[#] %s;%d\n", data, FLAG_SERVER);
       } else if(datatype == TEMPERATURE) {
          printf("[#] %s;%d\n", data, TEMPERATURE_C_SERVER);
-         char toSend[4];
-         convert_f(data, toSend);
-         printf("[#] %s;%d\n", toSend, TEMPERATURE_F_SERVER);
+         convert_f(data, field);
+         printf("[#] %s;%d\n", field, TEMPERATURE_F_SERVER);
       }
       break;
    default:
@@ -214,7 +218,8 @@ PROCESS_THREAD(temp_alarm, ev, data) {
          flag = FLAG_OFF;
          process_poll(&led_blink);     
       }
-
+      
+      
       SENSORS_DEACTIVATE(temperature_sensor);
       etimer_reset(&periodic_timer);
    }

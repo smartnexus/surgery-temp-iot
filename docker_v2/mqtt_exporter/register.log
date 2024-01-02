@@ -1,2 +1,15 @@
 INFO:[mqtt-exporter]:Serial Port /dev/ACM0 is opened
 DEBUG:[mqtt-exporter]: Connecting to localhost
+ERROR:[mqtt-exporter]:serial port is already opened or does not exist
+ERROR:[mqtt-exporter]:serial port is already opened or does not exist
+ERROR:[mqtt-exporter]:serial port is already opened or does not exist
+ERROR:[mqtt-exporter]:serial port is already opened or does not exist
+ERROR:[mqtt-exporter]:serial port is already opened or does not exist
+ERROR:[mqtt-exporter]:serial port is already opened or does not exist
+ERROR:[mqtt-exporter]:serial port is already opened or does not exist
+ERROR:[mqtt-exporter]:serial port is already opened or does not exist
+ERROR:[mqtt-exporter]:serial port is already opened or does not exist
+ERROR:[mqtt-exporter]:serial port is already opened or does not exist
+ERROR:[mqtt-exporter]:serial port is already opened or does not exist
+ERROR:[mqtt-exporter]:serial port is already opened or does not exist
+ERROR:[mqtt-exporter]:serial port is already opened or does not exist
