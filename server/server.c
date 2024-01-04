@@ -29,13 +29,13 @@ void convert_f(char* value, char* dest);
 static struct simple_udp_connection connections[2];
 int ports[2] = {SENSOR_PORT, REMOTO_PORT};
 
-int8_t pending_update = 0;
-int flags[2] = {0,0};
+static int8_t pending_update = 0;
+static uint8_t flags[2] = {(uint8_t) 0, (uint8_t) 0};
 
 static char field[4];
 /*------------------------------SENSOR------------------------------------*/
-static int flag = FLAG_OFF;
-static int estado_boton = 0;
+static uint8_t flag = FLAG_OFF;
+static uint8_t estado_boton = 0;
 static int16_t int_temp_c;
 static int16_t frac_temp_c;
 static int16_t int_temp_f;
@@ -95,13 +95,28 @@ void push_mqtt(char* data, uint8_t datatype, uint8_t nodeid) {
    }
 }
 static void udp_rx_callback(struct simple_udp_connection *c, const uip_ipaddr_t *sender_addr, uint16_t sender_port, const uip_ipaddr_t *receiver_addr, uint16_t receiver_port, const uint8_t *data, uint16_t datalen) {
+   
+      printf("[DEBUG] [message_code=4] flags[SERVER_ID] = %d \n", flags[SERVER_ID]);
+      printf("[DEBUG] [message_code=4] flags[SENSOR_ID] = %d \n", flags[SENSOR_ID]);
+  
+   uint8_t nodeID;
+   int message_code;
+   char info_2[2];
+   char info_4[4];
+   char* cuerpo;
+   char* content;
+   char* mensaje;
+
    LOG_INFO("\n");
    LOG_INFO("[*] Mensaje recibido: ('%.*s')\n", datalen, (char *) data);
 
-   char* mensaje = (char *) data;
+   mensaje = (char *) data;
    snprintf(mensaje, datalen+1, "%s", (char *) data);
-   int message_code = atoi(&mensaje[0]);
-   char* content = mensaje+2;
+   message_code = atoi(&mensaje[0]);
+   content = mensaje+2;
+
+      printf("[DEBUG] [message_code=4] flags[SERVER_ID] = %d \n", flags[SERVER_ID]);
+      printf("[DEBUG] [message_code=4] flags[SENSOR_ID] = %d \n", flags[SENSOR_ID]);
 
    switch (message_code) {
    case 1:
@@ -109,12 +124,11 @@ static void udp_rx_callback(struct simple_udp_connection *c, const uip_ipaddr_t 
       push_mqtt(content, TEMPERATURE, SENSOR_ID);
       // Send pending flag updates to SENSOR
       if(pending_update != 0) {
-         char info[2];
-         snprintf(info, sizeof(info), "%d", pending_update);
-         simple_udp_sendto(&connections[0], info, strlen(info), sender_addr);
+         snprintf(info_2, sizeof(info_2), "%d", pending_update);
+         simple_udp_sendto(&connections[0], info_2, strlen(info_2), sender_addr);
          LOG_INFO("   --> Valor recuperado de la variable global: %d\n", pending_update);
          pending_update = 0;
-         LOG_INFO("   --> Enviando actualizacion pendiente de flag al SENSOR: %s\n", info);
+         LOG_INFO("   --> Enviando actualizacion pendiente de flag al SENSOR: %s\n", info_2);
       } else {
          LOG_INFO("   --> Saltando envio de actualizacion pendiente al SENSOR \n");
       }
@@ -124,20 +138,21 @@ static void udp_rx_callback(struct simple_udp_connection *c, const uip_ipaddr_t 
       // Push new value from REMOTE to MQTT server
       push_mqtt(content, FLAG, SENSOR_ID);
       // Send to REMOTO new flag value
-      flags[SENSOR_ID] = atoi(content);
+      flags[SENSOR_ID] = (uint8_t) atoi(content);
+      printf("[DEBUG] [message_code=4] flags[SENSOR_ID] = %d \n", flags[SENSOR_ID]);
       LOG_INFO("   --> programando actualizacion del flag del REMOTO: %d:%d\n", flags[SERVER_ID], flags[SENSOR_ID]);
       break;
-   case 3: ;
+   case 3: 
       LOG_INFO("   --> <msg=3> recibido conmutacion estado de flag de REMOTO: %s\n", content);
       // Push new value from REMOTE to MQTT server
-      char* cuerpo = content;
-      uint8_t nodeID = atoi(&content[0]);
+      cuerpo = content;
+      nodeID = atoi(&content[0]);
       // Send to SENSOR new flag value
       char* toSend = cuerpo+2;
       push_mqtt(&content[2], FLAG, nodeID);
       switch (nodeID) {
       case SERVER_ID:
-         flag = atoi(toSend);
+         flag = (uint8_t) atoi(toSend);
          LOG_INFO("   --> programando actualizacion del flag del SERVIDOR: %s\n", toSend);
          break;
       case SENSOR_ID:
@@ -148,18 +163,18 @@ static void udp_rx_callback(struct simple_udp_connection *c, const uip_ipaddr_t 
          break;
       }
       break;
-   case 4: ;
+   case 4:
       LOG_INFO("   --> <msg=4> recibido peticion de estado de alarmas de REMOTO: %s\n", content);
-      char info[4];
-      snprintf(info, sizeof(info), "%d:%d", flags[SERVER_ID], flags[SENSOR_ID]);
-      printf("INFO: %s \n",info);
-      printf("FLAG 1: %d \n",flags[SERVER_ID]);
-      printf("FLAG 2: %d \n",flags[SENSOR_ID]);
-      simple_udp_sendto(&connections[1], info, strlen(info), sender_addr);
-      LOG_INFO("   --> Enviando actualizacion pendiente de flag al REMOTO: %s\n", info);
-      for (int i = 0; i < 2; i++) {
-         flags[i] = (int) 0;
-      }
+      snprintf(info_4, sizeof(info_4), "%d:%d", flags[SERVER_ID], flags[SENSOR_ID]);
+      printf("[DEBUG] [message_code=4] flags[SERVER_ID] = %d \n", flags[SERVER_ID]);
+      printf("[DEBUG] [message_code=4] flags[SENSOR_ID] = %d \n", flags[SENSOR_ID]);
+      printf("[DEBUG] [message_code=4] mensaje : %s", info_4);
+      simple_udp_sendto(&connections[1], info_4, strlen(info_4), sender_addr);
+      LOG_INFO("   --> Enviando actualizacion pendiente de flag al REMOTO: %s\n", info_4);
+      flags[SERVER_ID] = (uint8_t) 0;
+      flags[SENSOR_ID] = (uint8_t) 0;
+      printf("[DEBUG] [message_code=4] flags[SERVER_ID] = %d \n", flags[SERVER_ID]);
+      printf("[DEBUG] [message_code=4] flags[SENSOR_ID] = %d \n", flags[SENSOR_ID]);
       break;
    default:
       LOG_INFO("   --> No se ha reconocido el codigo del mensaje recibido.\n");
@@ -218,7 +233,7 @@ PROCESS_THREAD(temp_alarm, ev, data) {
     
       LOG_INFO("Se comprueba el flag -> '%d'.\n", flag);
       if (flag == FLAG_ON && (int_tmp_c < UMBRAL_BOTTOM || int_tmp_c > UMBRAL_TOP)){
-         flag = FLAG_OFF;
+         flag = (uint8_t) FLAG_OFF;
          process_poll(&led_blink);     
       }
       
@@ -258,7 +273,7 @@ PROCESS_THREAD(led_blink, ev, data) {
       rgb_led_off();
       estado_boton = 0;
 
-      flags[SERVER_ID] = (int) flag;
+      flags[SERVER_ID] = (uint8_t) flag;
       printf("ABAJO flag: %d \n",flags[SERVER_ID]);
    }   
    PROCESS_END();
