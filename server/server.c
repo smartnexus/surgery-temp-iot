@@ -30,7 +30,7 @@ static struct simple_udp_connection connections[2];
 int ports[2] = {SENSOR_PORT, REMOTO_PORT};
 
 int8_t pending_update = 0;
-int flags[2] = {0,0};
+uint8_t flags[2] = {FLAG_DEFAULT,FLAG_DEFAULT};
 
 static char field[4];
 /*------------------------------SENSOR------------------------------------*/
@@ -67,7 +67,6 @@ void convert_f(char* value, char* dest) {
 }
 void push_mqtt(char* data, uint8_t datatype, uint8_t nodeid) {
    LOG_INFO("[*] Mensaje enviado para MQTT EXPORTER\n");
-   LOG_INFO("   --> Mandando datos por puerto serie para lectura MQTT.\n");
    LOG_INFO("   --> %s - %d - %d <\n", data, datatype, nodeid);
    // Using character "#" to differ between logs and communication protocol
    switch(nodeid) {
@@ -124,7 +123,7 @@ static void udp_rx_callback(struct simple_udp_connection *c, const uip_ipaddr_t 
       // Push new value from REMOTE to MQTT server
       push_mqtt(content, FLAG, SENSOR_ID);
       // Send to REMOTO new flag value
-      flags[SENSOR_ID] = atoi(content);
+      flags[SENSOR_ID] = (uint8_t) atoi(content);
       LOG_INFO("   --> programando actualizacion del flag del REMOTO: %d:%d\n", flags[SERVER_ID], flags[SENSOR_ID]);
       break;
    case 3: ;
@@ -152,13 +151,10 @@ static void udp_rx_callback(struct simple_udp_connection *c, const uip_ipaddr_t 
       LOG_INFO("   --> <msg=4> recibido peticion de estado de alarmas de REMOTO: %s\n", content);
       char info[4];
       snprintf(info, sizeof(info), "%d:%d", flags[SERVER_ID], flags[SENSOR_ID]);
-      printf("INFO: %s \n",info);
-      printf("FLAG 1: %d \n",flags[SERVER_ID]);
-      printf("FLAG 2: %d \n",flags[SENSOR_ID]);
       simple_udp_sendto(&connections[1], info, strlen(info), sender_addr);
       LOG_INFO("   --> Enviando actualizacion pendiente de flag al REMOTO: %s\n", info);
       for (int i = 0; i < 2; i++) {
-         flags[i] = (int) 0;
+         flags[i] = FLAG_DEFAULT;
       }
       break;
    default:
@@ -258,7 +254,7 @@ PROCESS_THREAD(led_blink, ev, data) {
       rgb_led_off();
       estado_boton = 0;
 
-      flags[SERVER_ID] = (int) flag;
+      flags[SERVER_ID] = (uint8_t) flag;
       printf("ABAJO flag: %d \n",flags[SERVER_ID]);
    }   
    PROCESS_END();

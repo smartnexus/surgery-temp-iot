@@ -75,10 +75,10 @@ udp_rx_callback(struct simple_udp_connection *c,
   printf("Server: %d Sensor: %d \n\n", state_recibido[SERVER_ID],state_recibido[SENSOR_ID]);
 
   //Cambio del valor del flag recibido
-  if (state_recibido[SERVER_ID]!=0){
+  if (state_recibido[SERVER_ID]!=FLAG_DEFAULT){
     state_nodo[SERVER_ID] = state_recibido[SERVER_ID];
   }
-  if (state_recibido[SENSOR_ID]!=0){
+  if (state_recibido[SENSOR_ID]!=FLAG_DEFAULT){
     state_nodo[SENSOR_ID] = state_recibido[SENSOR_ID];
   }
 
