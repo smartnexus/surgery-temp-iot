@@ -227,6 +227,7 @@ PROCESS_THREAD(temp_alarm, ev, data) {
 }
 PROCESS_THREAD(led_blink, ev, data) {
    static struct etimer led_timer;
+   static char str_button[32];
 
    PROCESS_BEGIN();
 
@@ -256,6 +257,9 @@ PROCESS_THREAD(led_blink, ev, data) {
 
       flags[SERVER_ID] = (uint8_t) flag;
       printf("ABAJO flag: %d \n",flags[SERVER_ID]);
+      
+      snprintf(str_button, sizeof(str_button), "%d", flags[SERVER_ID]);
+      push_mqtt(str_button, FLAG, SERVER_ID);
    }   
    PROCESS_END();
 }
