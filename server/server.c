@@ -256,7 +256,7 @@ PROCESS_THREAD(led_blink, ev, data) {
       estado_boton = 0;
 
       flags[SERVER_ID] = (uint8_t) flag;
-      printf("ABAJO flag: %d \n",flags[SERVER_ID]);
+      printf("Flag servidor actualizada 'desarmada': %d \n",flags[SERVER_ID]);
       
       snprintf(str_button, sizeof(str_button), "%d", flags[SERVER_ID]);
       push_mqtt(str_button, FLAG, SERVER_ID);
