@@ -2,3 +2,5 @@ build/
 *.old
 *.nrf52840
 Contenedores/
+logs.txt
+*.log

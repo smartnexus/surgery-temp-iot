@@ -23,6 +23,8 @@ services:
       - prometheus
     environment:
       - MQTT_ADDRESS="localhost"
+    volumes:
+      - ./mqtt_exporter/main.py:/mqtt-exporter/main.py
     ports:
       - 9000:9000
     restart: unless-stopped

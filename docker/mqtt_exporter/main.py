@@ -10,19 +10,24 @@ import logging
 import os
 import sys
 import serial
+import time
 
 import paho.mqtt.client as mqtt
 from prometheus_client import Counter, Gauge, start_http_server
 
-temperature_c_server = 0
-temperature_c_sensor = 1
-temperature_f_server = 2
-temperature_f_sensor = 3
-flag_server = 4
-flag_sensor = 5
-
 logging.basicConfig(filename='register.log', level=logging.DEBUG)
 LOG = logging.getLogger("[mqtt-exporter]")
+
+########################################################################
+# Shorcuts
+########################################################################
+
+temperature_c_server = b'0'
+temperature_c_sensor = b'1'
+temperature_f_server = b'2'
+temperature_f_sensor = b'3'
+flag_server = b'4'
+flag_sensor = b'5'
 
 ########################################################################
 # Prometheus
@@ -85,7 +90,6 @@ def create_gauge_flag_sensor_metrics():
     prom_flag_sensor_gauge = Gauge( 'flag_sensor',
         'Flag alarm Sensor [1->off; 2->on]'
     )
-
 
 def parse_message(raw_topic, raw_payload):
     try:
@@ -167,15 +171,15 @@ def on_message(_, userdata, msg):
     prom_msg_counter.inc()
     if(msg.topic == "temp_c_server"):
         prom_temp_c_server_gauge.set(payload)
-    if(msg.topic == "temp_c_sensor"):
+    elif(msg.topic == "temp_c_sensor"):
         prom_temp_c_sensor_gauge.set(payload)
-    if(msg.topic == "temp_f_server"):
+    elif(msg.topic == "temp_f_server"):
         prom_temp_f_server_gauge.set(payload)
-    if(msg.topic == "temp_f_sensor"):
+    elif(msg.topic == "temp_f_sensor"):
         prom_temp_f_sensor_gauge.set(payload)
-    if(msg.topic == "flag_server"):
+    elif(msg.topic == "flag_server"):
         prom_flag_server_gauge.set(payload)
-    if(msg.topic == "flag_sensor"):
+    elif(msg.topic == "flag_sensor"):
         prom_flag_sensor_gauge.set(payload)
 
 ########################################################################
@@ -234,36 +238,52 @@ def main():
     client.loop_start()
 
     while True:
-        # Reading from serial port
-        line = ser.readline()
-        # Print data received
-        LOG.debug("Serial Data: %s", str(line, 'ascii').rstrip())
-        print("Serial Data: {0:s}".format(str(line, 'ascii').rstrip()))
-        # Get data
-        csv_fields=line.rstrip()
-        fields=csv_fields.split(b'\x3B')   # codigo ascii del ; en hexadecimal
-        
-        # debug
-        index=0
-        for value in fields:
-            LOG.debug("Field[%d]: %f", index, float(value))
-            print("Field[{0:d}]: {1:f}".format(index, float(value)))
-            index = index + 1
-        
-        print(fields)
-        # Publish data on corresponding topic
-        if(fields[1] == temperature_c_server):
-            client.publish(topic="temp_c_server", payload=fields[0], qos=0, retain=False)
-        if(fields[1] == temperature_c_sensor):
-            client.publish(topic="temp_c_sensor", payload=fields[0], qos=0, retain=False)
-        if(fields[1] == temperature_f_server):
-            client.publish(topic="temp_f_server", payload=fields[0], qos=0, retain=False)
-        if(fields[1] == temperature_f_sensor):
-            client.publish(topic="temp_f_sensor", payload=fields[0], qos=0, retain=False)
-        if(fields[1] == flag_server):
-            client.publish(topic="flag_server", payload=fields[0], qos=0, retain=False)
-        if(fields[1] == flag_sensor):
-            client.publish(topic="flag_sensor", payload=fields[0], qos=0, retain=False)
+    
+        try:
+            # Reading from serial port
+            line = ser.readline()
+            # Print data received
+            content = line.rstrip()
+            if content.startswith(b'[#]'):
+                LOG.debug("Serial Data: %s", str(line, 'ascii').rstrip())
+                print("Serial Data: {0:s}".format(str(line, 'ascii').rstrip()))
+                
+                # Get data, remove prefix
+                body = content[len("[#] "):]
+                [value,type] = body.split(b';')
+                print("Tipo", type, "valor", value)
+
+                # Identify topic
+                topic = None
+                if(type == temperature_c_server):
+                    topic = "temp_c_server"
+                elif(type == temperature_c_sensor):
+                    topic = "temp_c_sensor"
+                elif(type == temperature_f_server):
+                    topic = "temp_f_server"
+                elif(type == temperature_f_sensor):
+                    topic = "temp_f_sensor"
+                elif(type == flag_server):
+                    topic = "flag_server"
+                elif(type == flag_sensor):
+                    topic = "flag_sensor"
+                
+                # Publish data on corresponding topic
+                print("Sending to ", topic, "value", value)
+                client.publish(topic=topic, payload=value, qos=0, retain=False)
+                print("Done")
+
+        except serial.serialutil.SerialException:
+            print("Se ha capturado una excepcion")
+            ser.close()
+            time.sleep(5)
+            ser.open()
+            if ser.isOpen():
+                ser.flushInput()
+                ser.flush()
+            LOG.info("Serial Port /dev/ACM0 is opened")
+            print("Serial Port /dev/ACM0 is opened")
+            continue
 
 
 ########################################################################
